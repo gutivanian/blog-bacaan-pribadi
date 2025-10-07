@@ -14,7 +14,7 @@ export default function CreatePage() {
           Create New Article
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Paste your HTML content below and we'll transform it into a beautifully styled article
+          Paste your HTML content below and we&apos;ll transform it into a beautifully styled article
         </p>
       </div>
 

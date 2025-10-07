@@ -5,7 +5,13 @@ import Link from 'next/link';
 
 async function getArticle(slug) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Auto-detect base URL
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'http://localhost:3000';
+
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
       cache: 'no-store'
     });
