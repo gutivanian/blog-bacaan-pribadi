@@ -3,24 +3,42 @@ import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
-// Read SSL certificate for Aiven
-let sslConfig = false;
+// Setup SSL configuration
+let sslConfig = {};
 
-// Try to read ca.pem from root directory
-try {
-  const caPath = path.join(process.cwd(), 'ca.pem');
-  if (fs.existsSync(caPath)) {
-    const ca = fs.readFileSync(caPath, 'utf8');
-    sslConfig = {
+// Priority: Environment variable > ca.pem file > No SSL
+if (process.env.DB_CA_CERT) {
+  // Production: Read from environment variable
+  console.log('📜 Using SSL certificate from environment variable');
+  sslConfig = {
+    ssl: {
       rejectUnauthorized: true,
-      ca: ca,
-    };
-    console.log('✅ SSL certificate loaded successfully from ca.pem');
-  } else {
-    console.warn('⚠️ ca.pem not found. Attempting connection without SSL.');
+      ca: process.env.DB_CA_CERT,
+    }
+  };
+} else {
+  // Development: Try to read from ca.pem file
+  try {
+    const certPath = path.join(process.cwd(), 'ca.pem');
+    
+    if (fs.existsSync(certPath)) {
+      console.log('📜 Using SSL certificate from ca.pem file');
+      sslConfig = {
+        ssl: {
+          rejectUnauthorized: true,
+          ca: fs.readFileSync(certPath).toString(),
+        }
+      };
+    } else {
+      console.log('⚠️  No SSL certificate found (no env var or ca.pem file)');
+      sslConfig = {
+        ssl: false
+      };
+    }
+  } catch (error) {
+    console.warn('⚠️  Error reading SSL certificate:', error.message);
+    sslConfig = { ssl: false };
   }
-} catch (error) {
-  console.error('❌ Error reading SSL certificate:', error.message);
 }
 
 const pool = new Pool({
@@ -29,30 +47,19 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  ssl: sslConfig,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000, // Increased for cloud connections
+  connectionTimeoutMillis: 10000,
+  ...sslConfig
 });
 
 // Test connection
-pool.on('connect', (client) => {
+pool.on('connect', () => {
   console.log('✅ Connected to PostgreSQL database');
-  console.log(`   Host: ${process.env.DB_HOST}`);
-  console.log(`   Database: ${process.env.DB_NAME}`);
-  console.log(`   SSL: ${sslConfig ? 'Enabled' : 'Disabled'}`);
 });
 
 pool.on('error', (err) => {
   console.error('❌ Unexpected error on idle client:', err.message);
-  console.error('   Code:', err.code);
-  
-  if (err.code === '28000') {
-    console.error('   💡 Authentication failed. Check:');
-    console.error('      - DB_USER and DB_PASSWORD in .env.local');
-    console.error('      - SSL certificate (ca.pem) is present');
-    console.error('      - Database allows connections from your IP');
-  }
 });
 
 export const query = async (text, params) => {
@@ -60,26 +67,12 @@ export const query = async (text, params) => {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('✅ Query executed', { 
-      query: text.substring(0, 50) + '...', 
-      duration: `${duration}ms`, 
-      rows: res.rowCount 
-    });
+    console.log(`✓ Query executed in ${duration}ms - ${res.rowCount} rows`);
     return res;
   } catch (error) {
     console.error('❌ Database query error:', error.message);
-    console.error('   Query:', text);
-    console.error('   Code:', error.code);
-    
-    // Provide helpful error messages
-    if (error.code === '28000') {
-      console.error('   💡 Authentication error - check credentials');
-    } else if (error.code === '3D000') {
-      console.error('   💡 Database does not exist');
-    } else if (error.code === '42P01') {
-      console.error('   💡 Table does not exist - run database setup');
-    }
-    
+    console.error('Query:', text);
+    console.error('Params:', params);
     throw error;
   }
 };
@@ -89,13 +82,10 @@ export const getClient = async () => {
   const query = client.query;
   const release = client.release;
 
-  // Set a timeout of 10 seconds for cloud connections
   const timeout = setTimeout(() => {
-    console.error('⚠️ A client has been checked out for more than 10 seconds!');
-    console.error('   Last query:', client.lastQuery);
-  }, 10000);
+    console.error('⚠️  A client has been checked out for more than 5 seconds!');
+  }, 5000);
 
-  // Monkey patch the query method to keep track of the last query executed
   client.query = (...args) => {
     client.lastQuery = args;
     return query.apply(client, args);
@@ -110,5 +100,15 @@ export const getClient = async () => {
 
   return client;
 };
+
+// Test connection on startup
+pool.query('SELECT NOW()')
+  .then(() => {
+    console.log('🚀 Database connection pool initialized successfully');
+  })
+  .catch((err) => {
+    console.error('❌ Failed to initialize database connection:', err.message);
+    console.error('Please check your database credentials in .env.local');
+  });
 
 export default pool;
