@@ -18,17 +18,26 @@ function formatDate(dateString) {
 // Fetch article data on server
 async function getArticle(slug) {
   try {
-    // Vercel automatically sets VERCEL_URL
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const host = process.env.VERCEL_URL || 'localhost:3000';
     const baseUrl = `${protocol}://${host}`;
+    
+    console.log('Base URL:', baseUrl);
+    console.log('Fetching article:', slug);
     
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
       cache: 'no-store'
     });
     
-    if (!response.ok) return null;
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('Failed to fetch article:', response.status);
+      return null;
+    }
+    
     const data = await response.json();
+    console.log('Article fetched successfully');
     return data.article;
   } catch (error) {
     console.error('Error fetching article:', error);
@@ -38,15 +47,20 @@ async function getArticle(slug) {
 
 // Server Component (async)
 export default async function BlogDetailPage({ params }) {
-  const { slug } = params;
+  // ⭐ AWAIT PARAMS - INI YANG PENTING
+  const { slug } = await params;
+  
+  console.log('Page rendering for slug:', slug);
+  
   const article = await getArticle(slug);
 
   if (!article) {
-    notFound(); // Akan render 404 page
+    console.log('Article not found, showing 404');
+    notFound();
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto p-4">
       <div className="mb-6">
         <Link
           href="/"
@@ -79,7 +93,9 @@ export default async function BlogDetailPage({ params }) {
 
 // Generate metadata untuk SEO
 export async function generateMetadata({ params }) {
-  const { slug } = params;
+  // ⭐ AWAIT PARAMS - INI JUGA PENTING
+  const { slug } = await params;
+  
   const article = await getArticle(slug);
 
   if (!article) {
@@ -91,5 +107,9 @@ export async function generateMetadata({ params }) {
   return {
     title: article.title,
     description: article.raw_html?.substring(0, 160),
+    openGraph: {
+      title: article.title,
+      description: article.raw_html?.substring(0, 160),
+    },
   };
 }
