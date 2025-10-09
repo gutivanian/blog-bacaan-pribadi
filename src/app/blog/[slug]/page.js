@@ -12,6 +12,7 @@ async function getArticle(slug) {
         ? `https://${process.env.VERCEL_URL}` 
         : 'http://localhost:3000';
 
+    console.log('base url api', baseUrl)
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
       cache: 'no-store'
     });
