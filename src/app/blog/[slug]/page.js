@@ -1,54 +1,48 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+// app/blog/[slug]/page.js
 import ArticleViewer from '@/components/ArticleViewer';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
-export default function BlogDetailPage() {
-  const params = useParams();
-  const slug = params.slug;
-  const [article, setArticle] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Format date helper
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
-  useEffect(() => {
-    if (!slug) return;
-
-    async function fetchArticle() {
-      try {
-        const baseUrl = window.location.origin;
-        const response = await fetch(`${baseUrl}/api/articles/${slug}`);
-        if (!response.ok) throw new Error('Failed to fetch');
-        const data = await response.json();
-        setArticle(data.article);
-      } catch (err) {
-        console.error('Error fetching article:', err);
-        setArticle(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchArticle();
-  }, [slug]);
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+// Fetch article data on server
+async function getArticle(slug) {
+  try {
+    // Vercel automatically sets VERCEL_URL
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.VERCEL_URL || 'localhost:3000';
+    const baseUrl = `${protocol}://${host}`;
+    
+    const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
+      cache: 'no-store'
     });
-  };
-
-  if (loading) {
-    return <div className="max-w-5xl mx-auto p-4">Loading article...</div>;
+    
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.article;
+  } catch (error) {
+    console.error('Error fetching article:', error);
+    return null;
   }
+}
+
+// Server Component (async)
+export default async function BlogDetailPage({ params }) {
+  const { slug } = params;
+  const article = await getArticle(slug);
 
   if (!article) {
-    return <div className="max-w-5xl mx-auto p-4">Article not found.</div>;
+    notFound(); // Akan render 404 page
   }
 
   return (
@@ -81,4 +75,21 @@ export default function BlogDetailPage() {
       <ArticleViewer article={article} />
     </div>
   );
+}
+
+// Generate metadata untuk SEO
+export async function generateMetadata({ params }) {
+  const { slug } = params;
+  const article = await getArticle(slug);
+
+  if (!article) {
+    return {
+      title: 'Article Not Found'
+    };
+  }
+
+  return {
+    title: article.title,
+    description: article.raw_html?.substring(0, 160),
+  };
 }
