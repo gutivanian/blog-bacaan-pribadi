@@ -1,8 +1,9 @@
-// components/ArticleViewer.js
+// components/ArticleViewer.js (UPDATED - dengan Highlight Feature)
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import LastReadButton from './LastReadButton';
+import HighlightManager from './HighlightManager';
 
 export default function ArticleViewer({ article }) {
   const [userSession, setUserSession] = useState(null);
@@ -183,6 +184,15 @@ export default function ArticleViewer({ article }) {
         className="article-content"
         dangerouslySetInnerHTML={{ __html: article.styled_html }}
       />
+
+      {/* Highlight Manager - NEW */}
+      {userSession && (
+        <HighlightManager
+          articleId={article.id}
+          userSession={userSession}
+          containerRef={contentRef}
+        />
+      )}
     </div>
   );
 }
