@@ -5,19 +5,19 @@ import Link from 'next/link';
 
 async function getArticle(slug) {
   try {
-    // Auto-detect base URL
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'http://localhost:3000';
+    // Auto-detect base URL (local or prod)
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://127.0.0.1:3000');
 
-    console.log('base url api', baseUrl)
+    console.log('Base URL API:', baseUrl);
+
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
-      cache: 'no-store'
+      cache: 'no-store',
     });
 
     if (!response.ok) {
+      console.error(`Failed to fetch article: ${response.status} ${response.statusText}`);
       return null;
     }
 
@@ -28,6 +28,7 @@ async function getArticle(slug) {
     return null;
   }
 }
+
 
 export async function generateMetadata({ params }) {
   const article = await getArticle(params.slug);
