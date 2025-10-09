@@ -5,21 +5,17 @@ import Link from 'next/link';
 
 async function getArticle(slug) {
   try {
-    // Auto-detect base URL (local or prod)
+    // Deteksi base URL untuk server-side
     const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://127.0.0.1:3000');
-
-    console.log('Base URL API:', baseUrl);
+      process.env.NEXT_PUBLIC_SITE_URL || // kamu set manual di vercel env
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
       cache: 'no-store',
+      next: { revalidate: 0 }
     });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch article: ${response.status} ${response.statusText}`);
-      return null;
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
     return data.article;
