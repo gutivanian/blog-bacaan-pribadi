@@ -1,52 +1,36 @@
-// app/blog/[slug]/page.js
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import ArticleViewer from '@/components/ArticleViewer';
 import Link from 'next/link';
 
-async function getArticle(slug) {
-  try {
-    // Deteksi base URL untuk server-side
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || // kamu set manual di vercel env
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+export default function BlogDetailPage() {
+  const params = useParams();
+  const slug = params.slug;
+  const [article, setArticle] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-    const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
-      cache: 'no-store',
-      next: { revalidate: 0 }
-    });
+  useEffect(() => {
+    if (!slug) return;
 
-    if (!response.ok) return null;
+    async function fetchArticle() {
+      try {
+        const baseUrl = window.location.origin;
+        const response = await fetch(`${baseUrl}/api/articles/${slug}`);
+        if (!response.ok) throw new Error('Failed to fetch');
+        const data = await response.json();
+        setArticle(data.article);
+      } catch (err) {
+        console.error('Error fetching article:', err);
+        setArticle(null);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    const data = await response.json();
-    return data.article;
-  } catch (error) {
-    console.error('Error fetching article:', error);
-    return null;
-  }
-}
-
-
-export async function generateMetadata({ params }) {
-  const article = await getArticle(params.slug);
-
-  if (!article) {
-    return {
-      title: 'Article Not Found',
-    };
-  }
-
-  return {
-    title: `${article.title} - HTML Blog`,
-    description: article.title,
-  };
-}
-
-export default async function BlogDetailPage({ params }) {
-  const article = await getArticle(params.slug);
-
-  if (!article) {
-    notFound();
-  }
+    fetchArticle();
+  }, [slug]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -58,6 +42,14 @@ export default async function BlogDetailPage({ params }) {
       minute: '2-digit'
     });
   };
+
+  if (loading) {
+    return <div className="max-w-5xl mx-auto p-4">Loading article...</div>;
+  }
+
+  if (!article) {
+    return <div className="max-w-5xl mx-auto p-4">Article not found.</div>;
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
