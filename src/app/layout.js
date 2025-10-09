@@ -2,7 +2,11 @@
 import { Inter } from 'next/font/google';
 import './globals.css';
 import ThemeToggle from '@/components/ThemeToggle';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import Link from 'next/link';
+import NProgress from 'nprogress';
+import 'nprogress/nprogress.css'; // pastikan import css
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -12,6 +16,17 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+   const pathname = usePathname();
+
+  useEffect(() => {
+    // Mulai loading saat route berubah
+    NProgress.start();
+
+    // Selesai loading setelah timeout singkat (atau bisa pake event listener)
+    const timer = setTimeout(() => NProgress.done(), 300);
+
+    return () => clearTimeout(timer);
+  }, [pathname]);
   return (
     <html lang="en" className="dark">
       <head>
