@@ -1,4 +1,4 @@
-// components/ArticleViewer.js (UPDATED - dengan Highlight Feature)
+// components/ArticleViewer.js (FIXED - Mobile Touch Support)
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -26,10 +26,10 @@ export default function ArticleViewer({ article }) {
   useEffect(() => {
     if (!contentRef.current) return;
 
-    // Initialize all interactive features
-    initializeToggleButtons();
-    initializeNavigation();
-    initializeBackToTop();
+    // Wait for DOM to be fully rendered
+    setTimeout(() => {
+      initializeInteractiveFeatures();
+    }, 100);
 
     // Track scroll for last read
     const handleScroll = () => {
@@ -49,7 +49,7 @@ export default function ArticleViewer({ article }) {
       window.removeEventListener('scroll', handleScroll);
       clearTimeout(window.scrollSaveTimeout);
     };
-  }, [userSession]);
+  }, [userSession, article.id]); // Add article.id to dependencies
 
   const fetchLastReadPosition = async (session) => {
     try {
@@ -88,39 +88,45 @@ export default function ArticleViewer({ article }) {
     }
   };
 
-  const initializeToggleButtons = () => {
-    const toggleButtons = contentRef.current?.querySelectorAll('.toggle-btn');
-    
-    toggleButtons?.forEach(btn => {
-      const handleClick = () => {
-        const sectionHeader = btn.closest('.section-header');
+  const initializeInteractiveFeatures = () => {
+    if (!contentRef.current) return;
+
+    // Use event delegation for all interactive elements
+    const handleClick = (e) => {
+      const target = e.target;
+
+      // Handle toggle buttons (Sembunyikan/Tampilkan)
+      if (target.classList.contains('toggle-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const sectionHeader = target.closest('.section-header');
         const sectionContent = sectionHeader?.nextElementSibling;
+        
+        console.log('Toggle clicked:', {
+          hasHeader: !!sectionHeader,
+          hasContent: !!sectionContent,
+          isHidden: sectionContent?.classList.contains('hidden')
+        });
         
         if (sectionContent?.classList.contains('section-content')) {
           const isHidden = sectionContent.classList.contains('hidden');
           
           if (isHidden) {
             sectionContent.classList.remove('hidden');
-            btn.textContent = 'Sembunyikan';
+            target.textContent = 'Sembunyikan';
           } else {
             sectionContent.classList.add('hidden');
-            btn.textContent = 'Tampilkan';
+            target.textContent = 'Tampilkan';
           }
         }
-      };
+        return;
+      }
 
-      btn.removeEventListener('click', handleClick);
-      btn.addEventListener('click', handleClick);
-    });
-  };
-
-  const initializeNavigation = () => {
-    const navLinks = contentRef.current?.querySelectorAll('.nav-link');
-    
-    navLinks?.forEach(link => {
-      const handleClick = (e) => {
+      // Handle navigation links
+      if (target.classList.contains('nav-link')) {
         e.preventDefault();
-        const targetId = link.getAttribute('href')?.substring(1);
+        const targetId = target.getAttribute('href')?.substring(1);
         const targetElement = document.getElementById(targetId);
 
         if (targetElement) {
@@ -129,34 +135,54 @@ export default function ArticleViewer({ article }) {
             block: 'start'
           });
         }
-      };
+        return;
+      }
 
-      link.removeEventListener('click', handleClick);
-      link.addEventListener('click', handleClick);
-    });
+      // Handle mobile sidebar toggle
+      if (target.classList.contains('toggle-nav')) {
+        e.preventDefault();
+        const sidebar = contentRef.current?.querySelector('.sidebar');
+        if (sidebar) {
+          sidebar.classList.toggle('active');
+        }
+        return;
+      }
 
-    // Toggle sidebar on mobile
-    const toggleNavBtn = contentRef.current?.querySelector('.toggle-nav');
-    const sidebar = contentRef.current?.querySelector('.sidebar');
-
-    if (toggleNavBtn && sidebar) {
-      const handleToggle = () => {
-        sidebar.classList.toggle('active');
-      };
-
-      toggleNavBtn.removeEventListener('click', handleToggle);
-      toggleNavBtn.addEventListener('click', handleToggle);
-    }
-  };
-
-  const initializeBackToTop = () => {
-    const backToTopBtn = contentRef.current?.querySelector('.back-to-top');
-    
-    if (backToTopBtn) {
-      const handleClick = () => {
+      // Handle back to top button
+      if (target.classList.contains('back-to-top')) {
+        e.preventDefault();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      };
+        return;
+      }
+    };
 
+    // Add touch event for better mobile support
+    const handleTouch = (e) => {
+      const target = e.target;
+      
+      if (target.classList.contains('toggle-btn') || 
+          target.classList.contains('nav-link') || 
+          target.classList.contains('toggle-nav') ||
+          target.classList.contains('back-to-top')) {
+        // Add visual feedback
+        target.style.opacity = '0.7';
+        setTimeout(() => {
+          target.style.opacity = '1';
+        }, 100);
+      }
+    };
+
+    // Remove old listeners if any
+    contentRef.current.removeEventListener('click', handleClick);
+    contentRef.current.removeEventListener('touchstart', handleTouch);
+
+    // Add new listeners with event delegation
+    contentRef.current.addEventListener('click', handleClick, true);
+    contentRef.current.addEventListener('touchstart', handleTouch, { passive: true });
+
+    // Back to top scroll handler
+    const backToTopBtn = contentRef.current?.querySelector('.back-to-top');
+    if (backToTopBtn) {
       const handleScroll = () => {
         if (window.scrollY > 300) {
           backToTopBtn.style.display = 'block';
@@ -165,12 +191,18 @@ export default function ArticleViewer({ article }) {
         }
       };
 
-      backToTopBtn.removeEventListener('click', handleClick);
-      backToTopBtn.addEventListener('click', handleClick);
-      
       window.removeEventListener('scroll', handleScroll);
       window.addEventListener('scroll', handleScroll);
+      handleScroll(); // Initial check
     }
+
+    // Log all interactive elements found
+    console.log('Interactive elements initialized:', {
+      toggleButtons: contentRef.current.querySelectorAll('.toggle-btn').length,
+      navLinks: contentRef.current.querySelectorAll('.nav-link').length,
+      sidebar: !!contentRef.current.querySelector('.sidebar'),
+      backToTop: !!contentRef.current.querySelector('.back-to-top')
+    });
   };
 
   return (
@@ -185,7 +217,7 @@ export default function ArticleViewer({ article }) {
         dangerouslySetInnerHTML={{ __html: article.styled_html }}
       />
 
-      {/* Highlight Manager - NEW */}
+      {/* Highlight Manager */}
       {userSession && (
         <HighlightManager
           articleId={article.id}
