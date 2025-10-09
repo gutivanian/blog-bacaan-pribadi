@@ -2,6 +2,7 @@
 import ArticleViewer from '@/components/ArticleViewer';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 
 // Format date helper
 function formatDate(dateString) {
@@ -18,44 +19,47 @@ function formatDate(dateString) {
 // Fetch article data on server
 async function getArticle(slug) {
   try {
+    // Get the actual host from request headers
+    const headersList = await headers();
+    const host = headersList.get('host');
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = process.env.VERCEL_URL || 'localhost:3000';
     const baseUrl = `${protocol}://${host}`;
     
-    console.log('Base URL:', baseUrl);
-    console.log('Fetching article:', slug);
+    console.log('🔍 Fetching from:', `${baseUrl}/api/articles/${slug}`);
     
     const response = await fetch(`${baseUrl}/api/articles/${slug}`, {
-      cache: 'no-store'
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+      }
     });
     
-    console.log('Response status:', response.status);
+    console.log('📊 Response status:', response.status);
     
     if (!response.ok) {
-      console.error('Failed to fetch article:', response.status);
+      console.error('❌ Failed to fetch article:', response.status);
       return null;
     }
     
     const data = await response.json();
-    console.log('Article fetched successfully');
+    console.log('✅ Article fetched successfully:', data.article?.title);
     return data.article;
   } catch (error) {
-    console.error('Error fetching article:', error);
+    console.error('💥 Error fetching article:', error.message);
     return null;
   }
 }
 
 // Server Component (async)
 export default async function BlogDetailPage({ params }) {
-  // ⭐ AWAIT PARAMS - INI YANG PENTING
   const { slug } = await params;
   
-  console.log('Page rendering for slug:', slug);
+  console.log('🎯 Rendering page for slug:', slug);
   
   const article = await getArticle(slug);
 
   if (!article) {
-    console.log('Article not found, showing 404');
+    console.log('🚫 Article not found, showing 404');
     notFound();
   }
 
@@ -93,7 +97,6 @@ export default async function BlogDetailPage({ params }) {
 
 // Generate metadata untuk SEO
 export async function generateMetadata({ params }) {
-  // ⭐ AWAIT PARAMS - INI JUGA PENTING
   const { slug } = await params;
   
   const article = await getArticle(slug);
